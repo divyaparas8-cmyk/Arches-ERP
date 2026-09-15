@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import Link from "next/link";
+import { STAGE_NAMES } from "@/lib/stageConstants";
 
 export const dynamic = "force-dynamic";
 
@@ -40,17 +41,6 @@ export default async function ClientPortalPage() {
 
   const client = await prisma.client.findUnique({ where: { id: Number(clientId) } });
 
-  const stageLabels = [
-    "Enquiry",
-    "Quote Sent",
-    "Deposit Invoiced",
-    "Deposit Paid",
-    "In Production",
-    "QC",
-    "Balance Invoiced",
-    "Shipped",
-  ];
-
   return (
     <div className="min-h-screen bg-[#f5f4f0] p-8 md:p-12">
       {/* Header */}
@@ -76,7 +66,7 @@ export default async function ClientPortalPage() {
         <div className="flex flex-col gap-4">
           {orders.map((order) => {
             const totalQty = order.lines.reduce((sum: number, l: any) => sum + l.qty, 0);
-            const stageLabel = stageLabels[order.stage] ?? `Stage ${order.stage}`;
+            const stageLabel = STAGE_NAMES[order.stage] ?? `Stage ${order.stage}`;
             const progressPct = Math.round((order.stage / 7) * 100);
 
             return (

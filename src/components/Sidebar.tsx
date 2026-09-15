@@ -22,26 +22,35 @@ export default async function Sidebar() {
           </p>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex flex-col space-y-1 px-4">
-          <ActiveNavItem href="/">Dashboard</ActiveNavItem>
-          <ActiveNavItem href="/quotes/new">New Quote</ActiveNavItem>
-          <ActiveNavItem href="/catalog">Catalog</ActiveNavItem>
-          <ActiveNavItem href="/clients">Clients</ActiveNavItem>
-          <ActiveNavItem href="/vendors">Vendors</ActiveNavItem>
-          <ActiveNavItem href="/invoices">Invoices</ActiveNavItem>
-        </nav>
+        {/* Navigation — hidden from client role (they only use /portal) */}
+        {role !== "client" && (
+          <nav className="flex flex-col space-y-1 px-4">
+            <ActiveNavItem href="/">Dashboard</ActiveNavItem>
+            <ActiveNavItem href="/quotes/new">New Quote</ActiveNavItem>
+            <ActiveNavItem href="/catalog">Catalog</ActiveNavItem>
+            <ActiveNavItem href="/clients">Clients</ActiveNavItem>
+            <ActiveNavItem href="/vendors">Vendors</ActiveNavItem>
+            <ActiveNavItem href="/invoices">Invoices</ActiveNavItem>
+          </nav>
+        )}
+
+        {/* Client Portal nav — only for client role */}
+        {role === "client" && (
+          <nav className="flex flex-col space-y-1 px-4">
+            <ActiveNavItem href="/portal">My Orders</ActiveNavItem>
+          </nav>
+        )}
       </div>
 
       {/* Footer Area */}
       <div className="p-4 flex flex-col space-y-4">
-        {/* Client Portal — only visible to 'client' role users */}
-        {role === "client" && (
+        {/* Internal staff: bordered client portal view link */}
+        {role !== "client" && (
           <Link
             href="/portal"
             className="text-[10px] uppercase tracking-[0.14em] px-4 py-3 border border-white/20 text-center hover:bg-white/5 transition-colors rounded-[2px]"
           >
-            Client portal ↗
+            Client portal view ↗
           </Link>
         )}
 

@@ -3,19 +3,19 @@ import { authOptions } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
 import prisma from "@/lib/prisma";
 import Link from "next/link";
+import {
+  orderValue,
+  calculateDeposit,
+  calculateBalance,
+  unitSell,
+  lineTotal,
+  PricingOrder,
+  PricingLine,
+} from "@/lib/pricing";
+import { STAGE_NAMES } from "@/lib/stageConstants";
+import ClientPortalActions from "./ClientPortalActions";
 
 export const dynamic = "force-dynamic";
-
-const stageLabels = [
-  "Enquiry",
-  "Quote Sent",
-  "Deposit Invoiced",
-  "Deposit Paid",
-  "In Production",
-  "Quality Check",
-  "Balance Invoiced",
-  "Shipped",
-];
 
 export default async function ClientOrderDetailPage({
   params,
@@ -45,18 +45,43 @@ export default async function ClientOrderDetailPage({
         orderBy: { position: "asc" },
       },
       comments: {
-        where: { who: "client" }, // client only sees client-facing comments
+        // SPEC §9: "Never shows internal notes" — only client-visible comments
+        where: { who: "client" },
         orderBy: { createdAt: "asc" },
       },
     },
   });
 
-  // Make sure the order belongs to this client
+  // Security: order must belong to this client
   if (!order || order.clientId !== Number(user.clientId)) {
     notFound();
   }
 
-  const stageLabel = stageLabels[order.stage] ?? `Stage ${order.stage}`;
+  // Build PricingOrder — SPEC §2: use sell side only, never show costs
+  const pricingOrder: PricingOrder = {
+    shippingPence: order.shippingPence ?? 0,
+    lines: order.lines.map((l: any): PricingLine => ({
+      qty: l.qty,
+      overridePence: l.overridePence,
+      blankCostPence: l.blankCostPence,
+      blankSellPence: l.blankSellPence,
+      sku: { basePence: l.sku.basePence, costPence: l.sku.costPence },
+      embellishments: l.embellishments.map((le: any) => ({
+        costPence: le.costPence,
+        sellPence: le.sellPence,
+        emb: { pricePence: le.emb.pricePence, costPence: le.emb.costPence },
+      })),
+    })),
+  };
+
+  const totalValuePence = orderValue(pricingOrder);
+  const depositPence = calculateDeposit(totalValuePence);
+  const balancePence = calculateBalance(totalValuePence, depositPence, order.shippingPence ?? 0);
+
+  const formatGBP = (pence: number) =>
+    new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", minimumFractionDigits: 2 }).format(pence / 100);
+
+  const stageLabel = STAGE_NAMES[order.stage] ?? `Stage ${order.stage}`;
   const progressPct = Math.round((order.stage / 7) * 100);
   const totalQty = order.lines.reduce((s: number, l: any) => s + l.qty, 0);
 
@@ -89,20 +114,20 @@ export default async function ClientOrderDetailPage({
         </span>
       </div>
 
-      {/* Progress */}
+      {/* Stage Progress */}
       <div className="bg-white rounded-md border border-stone-200 p-6 mb-6">
         <div className="flex justify-between items-center mb-3">
           <p className="text-sm font-semibold text-stone-900">{stageLabel}</p>
           <p className="text-[11px] text-stone-400">{progressPct}% complete</p>
         </div>
-        <div className="w-full bg-stone-100 rounded-full h-2">
+        <div className="w-full bg-stone-100 rounded-full h-2 mb-4">
           <div
             className="bg-stone-900 h-2 rounded-full transition-all"
             style={{ width: `${progressPct}%` }}
           />
         </div>
-        <div className="mt-4 grid grid-cols-4 md:grid-cols-8 gap-1">
-          {stageLabels.map((label, i) => (
+        <div className="grid grid-cols-4 md:grid-cols-8 gap-1">
+          {STAGE_NAMES.map((label, i) => (
             <div key={i} className="text-center">
               <div
                 className={`w-2 h-2 rounded-full mx-auto mb-1 ${
@@ -119,7 +144,37 @@ export default async function ClientOrderDetailPage({
         </div>
       </div>
 
-      {/* Tracking info if shipped */}
+      {/* SPEC §9: Quote Approve button — only at Stage 0 */}
+      {order.stage === 0 && order.status === "active" && (
+        <ClientPortalActions orderId={order.id} stage={order.stage} />
+      )}
+
+      {/* Financials — SPEC §9: order value, deposit, balance, delivery */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-md border border-stone-200 p-5">
+          <p className="text-[9px] uppercase tracking-[0.18em] text-stone-400 mb-1">Order Value</p>
+          <p className="text-xl font-black text-stone-900">{formatGBP(totalValuePence)}</p>
+        </div>
+        <div className="bg-white rounded-md border border-stone-200 p-5">
+          <p className="text-[9px] uppercase tracking-[0.18em] text-stone-400 mb-1">Deposit 50%</p>
+          <p className="text-xl font-black text-stone-900">{formatGBP(depositPence)}</p>
+        </div>
+        <div className="bg-white rounded-md border border-stone-200 p-5">
+          <p className="text-[9px] uppercase tracking-[0.18em] text-stone-400 mb-1">
+            Balance {order.shippingPence ? "+ Shipping" : ""}
+          </p>
+          <p className="text-xl font-black text-stone-900">
+            {balancePence > 0 ? formatGBP(balancePence) : "TBC"}
+          </p>
+        </div>
+        <div className="bg-white rounded-md border border-stone-200 p-5">
+          <p className="text-[9px] uppercase tracking-[0.18em] text-stone-400 mb-1">Delivery</p>
+          <p className="text-xl font-black text-stone-900">{order.weeks} wks</p>
+          <p className="text-[10px] text-stone-400 mt-1">{totalQty} items</p>
+        </div>
+      </div>
+
+      {/* Tracking info — shown when shipped */}
       {order.tracking && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-md p-4 mb-6">
           <p className="text-[10px] uppercase tracking-[0.15em] text-emerald-600 mb-1">Shipment Tracking</p>
@@ -130,7 +185,7 @@ export default async function ClientOrderDetailPage({
         </div>
       )}
 
-      {/* Order Lines */}
+      {/* Order Lines — SPEC §9: SKU, colorway, qty, unit price, line total */}
       <div className="bg-white rounded-md border border-stone-200 mb-6">
         <div className="px-6 py-4 border-b border-stone-100">
           <p className="text-[10px] uppercase tracking-[0.2em] text-stone-400">
@@ -138,54 +193,50 @@ export default async function ClientOrderDetailPage({
           </p>
         </div>
         <div className="divide-y divide-stone-100">
-          {order.lines.map((line: any) => (
-            <div key={line.id} className="px-6 py-4 flex items-center gap-4">
-              <div
-                className="w-5 h-5 rounded-full border border-stone-200 shrink-0"
-                style={{ backgroundColor: line.color.hex }}
-                title={line.color.name}
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-stone-900">{line.sku.name}</p>
-                <p className="text-[11px] text-stone-400">
-                  {line.color.name} · Qty: {line.qty}
-                  {line.embellishments.length > 0 && (
-                    <span> · {line.embellishments.map((e: any) => e.emb.name).join(", ")}</span>
-                  )}
-                </p>
+          {order.lines.map((line: any, idx: number) => {
+            const pricingLine: PricingLine = pricingOrder.lines[idx];
+            const unitP = unitSell(pricingLine);
+            const lineTotalP = lineTotal(pricingLine);
+            return (
+              <div key={line.id} className="px-6 py-4 flex items-center gap-4">
+                <div
+                  className="w-5 h-5 rounded-full border border-stone-200 shrink-0"
+                  style={{ backgroundColor: line.color.hex }}
+                  title={line.color.name}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-stone-900">{line.sku.name}</p>
+                  <p className="text-[11px] text-stone-400">
+                    {line.color.name} · {line.sku.code}
+                    {line.embellishments.length > 0 && (
+                      <span> · {line.embellishments.map((e: any) => e.emb.name).join(", ")}</span>
+                    )}
+                  </p>
+                </div>
+                {/* SPEC §9: unit price and line total */}
+                <div className="shrink-0 text-right">
+                  <p className="text-sm font-semibold text-stone-900">{formatGBP(lineTotalP)}</p>
+                  <p className="text-[10px] text-stone-400">
+                    {line.qty} × {formatGBP(unitP)}
+                  </p>
+                </div>
               </div>
-              <div className="shrink-0 text-[10px] font-mono text-stone-400">
-                #{line.position}
-              </div>
-            </div>
-          ))}
+            );
+          })}
+        </div>
+        <div className="px-6 py-4 border-t border-stone-200 flex justify-between items-center bg-stone-50">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-stone-500">Order Total</p>
+          <p className="text-base font-black text-stone-900">{formatGBP(totalValuePence)}</p>
         </div>
       </div>
 
-      {/* Comments from Arches (client-visible only) */}
-      {order.comments.length > 0 && (
-        <div className="bg-white rounded-md border border-stone-200">
-          <div className="px-6 py-4 border-b border-stone-100">
-            <p className="text-[10px] uppercase tracking-[0.2em] text-stone-400">Messages from Arches</p>
-          </div>
-          <div className="divide-y divide-stone-100">
-            {order.comments.map((comment: any) => (
-              <div key={comment.id} className="px-6 py-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <p className="text-[10px] uppercase tracking-wider font-bold text-stone-700">{comment.name}</p>
-                  <span className="text-stone-300">·</span>
-                  <p className="text-[10px] text-stone-400">
-                    {new Date(comment.createdAt).toLocaleDateString("en-GB", {
-                      day: "numeric", month: "short", year: "numeric",
-                    })}
-                  </p>
-                </div>
-                <p className="text-sm text-stone-600">{comment.body}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* SPEC §9: Order comment thread — client can comment */}
+      <ClientPortalActions
+        orderId={order.id}
+        stage={order.stage}
+        showCommentOnly
+        comments={order.comments}
+      />
     </div>
   );
 }
