@@ -1,0 +1,329 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Currency {
+  GBP
+  USD
+  EUR
+}
+
+enum SkuCategory {
+  T_Shirts   @map("T-Shirts")
+  Sweats
+  Bottoms
+  Bags
+  Headwear
+  Outerwear
+  Accessories
+}
+
+enum UserRole {
+  owner
+  sales
+  production
+  accounting
+  client
+}
+
+enum OrderStatus {
+  active
+  declined
+}
+
+enum CommentAuthor {
+  client
+  internal
+}
+
+enum CommentScope {
+  order
+  artwork
+}
+
+enum Actor {
+  Sales
+  Design
+  Production
+  Accounting
+  System
+  Xero
+}
+
+enum XeroStatus {
+  queued
+  synced
+  error
+}
+
+enum XeroKind {
+  deposit
+  balance
+}
+
+model Vendor {
+  id             Int       @id @default(autoincrement())
+  name           String    @unique
+  type           String
+  loc            String
+  lead           String
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  skus           Sku[]
+  embellishments Embellishment[]
+  lineBlanks     LineItem[] @relation("LineBlankVendor")
+  lineEmbs       LineEmbellishment[]
+
+  @@map("vendors")
+}
+
+model Colorway {
+  code       String  @id @db.Char(3)
+  name       String
+  hex        String  @db.Char(7)
+  vendorName String? @map("vendor_name")
+
+  lineItems  LineItem[]
+
+  @@map("colorways")
+}
+
+model Sku {
+  code       String      @id
+  name       String
+  cat        SkuCategory
+  gsm        String      @default("—")
+  brand      String      @default("Arches Blanks")
+  vendorId   Int?        @map("vendor_id")
+  vendor     Vendor?     @relation(fields: [vendorId], references: [id])
+  basePence  Int         @map("base_pence")
+  costPence  Int         @map("cost_pence")
+  active     Boolean     @default(true)
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  lineItems  LineItem[]
+
+  @@map("skus")
+}
+
+model Embellishment {
+  code       String  @id
+  name       String
+  vendorId   Int?    @map("vendor_id")
+  vendor     Vendor? @relation(fields: [vendorId], references: [id])
+  pricePence Int     @map("price_pence")
+  costPence  Int     @map("cost_pence")
+  active     Boolean @default(true)
+
+  lineEmbs   LineEmbellishment[]
+
+  @@map("embellishments")
+}
+
+model Client {
+  id         Int       @id @default(autoincrement())
+  name       String    @unique
+  contact    String?
+  email      String?
+  loc        String?
+  createdAt  DateTime  @default(now()) @map("created_at")
+  currency   Currency  @default(GBP)
+
+  users      User[]
+  orders     Order[]
+
+  @@map("clients")
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  name         String
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  role         UserRole
+  clientId     Int?      @map("client_id")
+  client       Client?   @relation(fields: [clientId], references: [id])
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  activityLogs ActivityLog[]
+
+  @@map("users")
+}
+
+model Order {
+  id             String       @id // e.g. 'ARC-1042'
+  seq            Int          @unique
+  clientId       Int          @map("client_id")
+  client         Client       @relation(fields: [clientId], references: [id])
+  contact        String?
+  stage          Int          @default(0) @db.SmallInt
+  status         OrderStatus  @default(active)
+  declinedReason String?      @map("declined_reason")
+  weeks          Int          @default(6) @db.SmallInt
+  shippingPence  Int          @default(0) @map("shipping_pence")
+  progress       Int          @default(0) @db.SmallInt
+  prodStart      DateTime?    @map("prod_start") @db.Date
+  tracking       String?
+  carrier        String?
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at")
+  currency       Currency     @default(GBP)
+
+  lines          LineItem[]
+  comments       Comment[]
+  activityLogs   ActivityLog[]
+  xeroRecords    XeroRecord[]
+  emailLogs      EmailLog[]
+
+  @@map("orders")
+}
+
+model LineItem {
+  id             Int       @id @default(autoincrement())
+  orderId        String    @map("order_id")
+  order          Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  position       Int       @db.SmallInt
+  skuCode        String    @map("sku_code")
+  sku            Sku       @relation(fields: [skuCode], references: [code])
+  colorCode      String    @map("color_code") @db.Char(3)
+  color          Colorway  @relation(fields: [colorCode], references: [code])
+  qty            Int
+
+  overridePence  Int?      @map("override_pence")
+  
+  blankVendorId  Int?      @map("blank_vendor_id")
+  blankVendor    Vendor?   @relation("LineBlankVendor", fields: [blankVendorId], references: [id])
+  blankCostPence Int?      @map("blank_cost_pence")
+  blankSellPence Int?      @map("blank_sell_pence")
+
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  embellishments LineEmbellishment[]
+  artwork        Artwork?
+
+  @@unique([orderId, position])
+  @@map("line_items")
+}
+
+model LineEmbellishment {
+  id         Int       @id @default(autoincrement())
+  lineId     Int       @map("line_id")
+  line       LineItem  @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  embCode    String    @map("emb_code")
+  emb        Embellishment @relation(fields: [embCode], references: [code])
+  vendorId   Int?      @map("vendor_id")
+  vendor     Vendor?   @relation(fields: [vendorId], references: [id])
+  costPence  Int?      @map("cost_pence")
+  sellPence  Int?      @map("sell_pence")
+
+  @@unique([lineId, embCode])
+  @@map("line_embellishments")
+}
+
+model Artwork {
+  id          Int       @id @default(autoincrement())
+  lineId      Int       @unique @map("line_id")
+  line        LineItem  @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  ver         Int       @default(1) @db.SmallInt
+  approved    Boolean   @default(false)
+  approvedAt  DateTime? @map("approved_at")
+  approvedBy  String?   @map("approved_by")
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  files       ArtworkFile[]
+  comments    Comment[]
+
+  @@map("artworks")
+}
+
+model ArtworkFile {
+  id         Int       @id @default(autoincrement())
+  artworkId  Int       @map("artwork_id")
+  artwork    Artwork   @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+  ver        Int       @db.SmallInt
+  url        String
+  filename   String
+  uploadedAt DateTime  @default(now()) @map("uploaded_at")
+
+  @@map("artwork_files")
+}
+
+model Comment {
+  id         Int           @id @default(autoincrement())
+  scope      CommentScope
+  orderId    String        @map("order_id")
+  order      Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  artworkId  Int?          @map("artwork_id")
+  artwork    Artwork?      @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+  who        CommentAuthor
+  name       String
+  body       String
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  @@map("comments")
+}
+
+model ActivityLog {
+  id         BigInt    @id @default(autoincrement())
+  orderId    String    @map("order_id")
+  order      Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  body       String
+  who        Actor
+  userId     Int?      @map("user_id")
+  user       User?     @relation(fields: [userId], references: [id])
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([orderId, createdAt(sort: Desc)])
+  @@map("activity_log")
+}
+
+model XeroRecord {
+  id            Int         @id @default(autoincrement())
+  orderId       String      @map("order_id")
+  order         Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  kind          XeroKind    @default(deposit)
+  ref           String?
+  xeroInvoiceId String?     @map("xero_invoice_id")
+  status        XeroStatus  @default(queued)
+  note          String?
+  amountPence   Int?        @map("amount_pence")
+  paidPence     Int         @default(0) @map("paid_pence")
+  lastError     String?     @map("last_error")
+  syncedAt      DateTime?   @map("synced_at")
+
+  @@unique([orderId, kind])
+  @@map("xero_records")
+}
+
+model XeroConnection {
+  id           Boolean   @id @default(true)
+  connected    Boolean   @default(false)
+  org          String?
+  tenantId     String?   @map("tenant_id")
+  accessToken  String?   @map("access_token")
+  refreshToken String?   @map("refresh_token")
+  expiresAt    DateTime? @map("expires_at")
+  autoPush     Boolean   @default(true) @map("auto_push")
+  lastSync     DateTime? @map("last_sync")
+
+  @@map("xero_connection")
+}
+
+model EmailLog {
+  id         BigInt    @id @default(autoincrement())
+  orderId    String?   @map("order_id")
+  order      Order?    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  template   String
+  toEmail    String    @map("to_email")
+  subject    String
+  providerId String?   @map("provider_id")
+  status     String    @default("sent")
+  sentAt     DateTime  @default(now()) @map("sent_at")
+
+  @@map("email_log")
+}

@@ -1,0 +1,15 @@
+## Progress
+
+- [x] Ticket 0 — Project setup (½ day)
+- [x] Ticket 1 — Schema, seed, Prisma client (1 day)
+- [x] Ticket 2 — Pricing module + tests (1 day)
+- [x] Ticket 3 — App shell, auth and roles (1 day)
+- [x] Ticket 4 — Read-only screens: Dashboard, Catalog, Clients, Vendors (2 days)
+- [x] Ticket 5 — Catalog editing (½ day)
+- [x] Ticket 6 — Quote builder (2 days)
+- [ ] Ticket 7 — Order detail and the stage machine (3 days)
+- [ ] Ticket 8 — Artwork approval per SKU (1½ days)
+- [ ] Ticket 9 — Client portal (2 days)
+- [ ] Ticket 10 — Xero OAuth in sandbox (2 days)
+- [ ] Ticket 11 — Outbound email (1 day)
+- [ ] Ticket 12 — Hardening and handover (1 day)
