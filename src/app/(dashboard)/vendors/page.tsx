@@ -21,7 +21,7 @@ export default async function VendorsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-warm-grey text-[14px]">
-            {vendors.map((vendor) => (
+            {vendors.map((vendor: any) => (
               <tr key={vendor.id} className="hover:bg-off-white transition-colors">
                 <td className="px-5 py-4 font-medium">{vendor.name}</td>
                 <td className="px-5 py-4">{vendor.type}</td>

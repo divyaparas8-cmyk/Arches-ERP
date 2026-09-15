@@ -42,8 +42,8 @@ export default async function InvoicesPage() {
     }
   };
 
-  const syncedCount = orders.filter((o) => o.xeroRecords.some((x) => x.status === "synced")).length;
-  const queuedCount = orders.filter((o) => o.stage >= 3 && !o.xeroRecords.some((x) => x.status === "synced")).length;
+  const syncedCount = orders.filter((o: any) => o.xeroRecords.some((x: any) => x.status === "synced")).length;
+  const queuedCount = orders.filter((o: any) => o.stage >= 3 && !o.xeroRecords.some((x: any) => x.status === "synced")).length;
 
   return (
     <div className="p-8 max-w-[1200px] mx-auto space-y-8">
@@ -113,7 +113,7 @@ export default async function InvoicesPage() {
         </h2>
 
         <div className="space-y-3">
-          {orders.map((order) => {
+          {orders.map((order: any) => {
             const pricingOrder: PricingOrder = {
               shippingPence: order.shippingPence,
               lines: order.lines.map((l: any) => ({
@@ -151,7 +151,7 @@ export default async function InvoicesPage() {
                     </Link>
                     <span className="text-[14px] font-medium">{order.client.name}</span>
                     <div className="flex -space-x-1">
-                      {order.lines.map((l) => (
+                      {order.lines.map((l: any) => (
                         <ColorSwatch key={l.id} hex={l.color.hex} name={l.color.name} size={14} />
                       ))}
                     </div>

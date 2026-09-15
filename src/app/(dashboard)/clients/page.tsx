@@ -25,7 +25,7 @@ export default async function ClientsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-warm-grey text-[14px]">
-            {clients.map((client) => (
+            {clients.map((client: any) => (
               <tr key={client.id} className="hover:bg-off-white transition-colors">
                 <td className="px-5 py-4 font-medium">{client.name}</td>
                 <td className="px-5 py-4">{client.contact || "—"}</td>

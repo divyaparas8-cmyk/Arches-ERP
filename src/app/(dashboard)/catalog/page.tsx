@@ -50,7 +50,7 @@ export default async function CatalogPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-warm-grey text-[14px]">
-              {skus.map((sku) => (
+              {skus.map((sku: any) => (
                 <tr key={sku.code} className="hover:bg-off-white transition-colors">
                   <td className="px-5 py-4 font-mono font-medium">{sku.code}</td>
                   <td className="px-5 py-4">{sku.name}</td>
@@ -92,7 +92,7 @@ export default async function CatalogPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-warm-grey text-[14px]">
-                {embellishments.map((emb) => (
+                {embellishments.map((emb: any) => (
                   <tr key={emb.code} className="hover:bg-off-white transition-colors">
                     <td className="px-5 py-4">{emb.name}</td>
                     <td className="px-5 py-4 text-mid-grey">{emb.vendor?.name || "—"}</td>
@@ -120,7 +120,7 @@ export default async function CatalogPage() {
           <h2 className="text-[10px] uppercase tracking-[0.14em] text-dark-grey mb-4">Colorways</h2>
           <div className="bg-white border border-warm-grey rounded-[2px] p-6 relative">
             <div className="grid grid-cols-5 gap-6">
-              {colorways.map((c) => (
+              {colorways.map((c: any) => (
                 <div key={c.code} className="flex flex-col items-center text-center">
                   <ColorSwatch hex={c.hex} name={c.name} size={32} />
                   <span className="mt-3 text-[10px] font-mono font-medium">{c.code}</span>

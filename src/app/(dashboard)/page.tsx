@@ -33,7 +33,7 @@ export default async function DashboardPage({
   });
 
   // Calculate KPIs on active orders
-  const activeOrders = allOrders.filter(o => o.status === "active");
+  const activeOrders = allOrders.filter((o: any) => o.status === "active");
   const openOrdersCount = activeOrders.length;
   
   let pipelineValue = 0;
@@ -60,7 +60,7 @@ export default async function DashboardPage({
     }))
   });
 
-  activeOrders.forEach(o => {
+  activeOrders.forEach((o: any) => {
     const pOrder = mapToPricingOrder(o);
     const val = orderValue(pOrder);
     const cost = orderCost(pOrder);
@@ -86,7 +86,7 @@ export default async function DashboardPage({
   ];
 
   // Filter orders for the table
-  const displayedOrders = allOrders.filter(o => {
+  const displayedOrders = allOrders.filter((o: any) => {
     if (o.status !== currentStatus) return false;
     if (currentStatus === "active" && filterStage !== null && o.stage !== filterStage) return false;
     return true;
@@ -182,10 +182,10 @@ export default async function DashboardPage({
 
       {/* All Orders Table */}
       <div className="space-y-2">
-        {displayedOrders.map(order => {
+        {displayedOrders.map((order: any) => {
           const pOrder = mapToPricingOrder(order);
           const val = orderValue(pOrder);
-          const totalQty = order.lines.reduce((sum, l) => sum + l.qty, 0);
+          const totalQty = order.lines.reduce((sum: number, l: any) => sum + l.qty, 0);
           
           return (
             <Link 
@@ -199,7 +199,7 @@ export default async function DashboardPage({
                   <span className="text-[14px]">{order.client.name}</span>
                   <div className="flex items-center space-x-3">
                     <div className="flex -space-x-1">
-                      {order.lines.map(l => (
+                      {order.lines.map((l: any) => (
                         <ColorSwatch key={l.id} hex={l.color.hex} name={l.color.name} size={14} />
                       ))}
                     </div>
