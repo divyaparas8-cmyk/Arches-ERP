@@ -14,6 +14,7 @@ import {
 } from "@/lib/pricing";
 import { STAGE_NAMES } from "@/lib/stageConstants";
 import ClientPortalActions from "./ClientPortalActions";
+import ArtworkApprovalSection from "./ArtworkApprovalSection";
 
 export const dynamic = "force-dynamic";
 
@@ -41,12 +42,22 @@ export default async function ClientOrderDetailPage({
           sku: true,
           color: true,
           embellishments: { include: { emb: true } },
+          artwork: {
+            include: {
+              files: { orderBy: { uploadedAt: "desc" } },
+              // SPEC §9: only client-facing artwork comments
+              comments: {
+                where: { who: "client" },
+                orderBy: { createdAt: "asc" },
+              },
+            },
+          },
         },
         orderBy: { position: "asc" },
       },
       comments: {
         // SPEC §9: "Never shows internal notes" — only client-visible comments
-        where: { who: "client" },
+        where: { who: "client", scope: "order" },
         orderBy: { createdAt: "asc" },
       },
     },
@@ -230,12 +241,101 @@ export default async function ClientOrderDetailPage({
         </div>
       </div>
 
+      {/* SPEC §9: Artwork Approval — shown at stage 2 when artworks exist */}
+      {order.stage === 2 && order.lines.some((l: any) => l.artwork) && (
+        <div className="bg-white rounded-md border border-stone-200 mb-6">
+          <div className="px-6 py-4 border-b border-stone-100 flex items-center justify-between">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-stone-400">
+              Artwork Approval Required
+            </p>
+            <span className="text-[9px] px-2 py-1 bg-amber-50 text-amber-700 rounded-full uppercase tracking-wider font-medium">
+              Awaiting Your Review
+            </span>
+          </div>
+          <div className="divide-y divide-stone-100">
+            {order.lines
+              .filter((l: any) => l.artwork)
+              .map((line: any) => (
+                <div key={line.id} className="p-6">
+                  {/* SKU header */}
+                  <div className="flex items-center gap-3 mb-4">
+                    <div
+                      className="w-4 h-4 rounded-full border border-stone-200 shrink-0"
+                      style={{ backgroundColor: line.color.hex }}
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-stone-900">
+                        {line.sku.name}
+                        <span className="ml-2 text-[10px] font-mono font-normal text-stone-400">
+                          {line.sku.code}
+                        </span>
+                      </p>
+                      <p className="text-[11px] text-stone-400">
+                        {line.color.name} · Qty {line.qty}
+                      </p>
+                    </div>
+                    {/* Approval status badge */}
+                    <span className={`text-[9px] px-2 py-1 rounded-full uppercase tracking-wider font-medium ${
+                      line.artwork.approved
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-amber-50 text-amber-700"
+                    }`}>
+                      {line.artwork.approved ? "✓ Approved" : "Pending Approval"}
+                    </span>
+                  </div>
+
+                  {/* Artwork files */}
+                  {line.artwork.files.length > 0 ? (
+                    <div className="mb-4">
+                      <p className="text-[9px] uppercase tracking-[0.18em] text-stone-400 mb-2">
+                        Artwork Files — Version {line.artwork.ver}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {line.artwork.files.map((file: any) => (
+                          <a
+                            key={file.id}
+                            href={file.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-3 py-2 bg-stone-50 border border-stone-200 rounded-[2px] text-[11px] text-stone-700 hover:bg-stone-100 transition-colors"
+                          >
+                            <span>📄</span>
+                            {file.filename}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mb-4 py-4 text-center bg-stone-50 rounded-[2px]">
+                      <p className="text-[11px] text-stone-400 uppercase tracking-wider">
+                        No artwork files uploaded yet
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Approve button + artwork comments — via client component */}
+                  <ArtworkApprovalSection
+                    orderId={order.id}
+                    artworkId={line.artwork.id}
+                    lineId={line.id}
+                    skuName={line.sku.name}
+                    alreadyApproved={line.artwork.approved}
+                    artworkComments={line.artwork.comments}
+                    clientName={user.name}
+                  />
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
       {/* SPEC §9: Order comment thread — client can comment */}
       <ClientPortalActions
         orderId={order.id}
         stage={order.stage}
         showCommentOnly
         comments={order.comments}
+        clientName={user.name}
       />
     </div>
   );
